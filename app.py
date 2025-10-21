@@ -10,11 +10,15 @@ from sklearn.preprocessing import LabelEncoder
 @st.cache_resource
 def load_model():
     try:
+        # Pastikan nama file sesuai
         model = pickle.load(open("best_model.pkl", "rb"))
-        le = pickle.load(open("standard_scaler.pkl", "rb"))
-        return model, le
+        encoder = pickle.load(open("label_encoder.pkl", "rb"))  # ubah sesuai isi sebenarnya
+        return model, encoder
+    except FileNotFoundError:
+        st.error("❌ File model tidak ditemukan. Pastikan `best_model.pkl` dan `label_encoder.pkl` ada di folder utama.")
+        st.stop()
     except Exception as e:
-        st.error("❌ Gagal memuat model atau encoder. Pastikan file 'model.pkl' dan 'label_encoder.pkl' ada di folder yang sama.")
+        st.error(f"❌ Gagal memuat model atau encoder: {e}")
         st.stop()
 
 model, le = load_model()
@@ -65,32 +69,21 @@ phq_questions = [
 
 options = {"Tidak Pernah": 0, "Jarang": 1, "Sering": 2, "Sangat Sering": 3}
 
-phq_score = 0
-responses = {}
-
-for q in phq_questions:
-    choice = st.radio(q, list(options.keys()), horizontal=True, index=1, key=q)
-    responses[q] = choice
-    phq_score += options[choice]
+phq_score = sum(st.radio(q, list(options.keys()), horizontal=True, index=1, key=q).replace(q, "") or options[st.session_state[q]] for q in phq_questions)
 
 # =========================================================
 # Interpretasi Skor PHQ-9
 # =========================================================
 if phq_score <= 4:
-    level = "Tidak ada / Minimal"
-    color = "🟢"
+    level, color = "Tidak ada / Minimal", "🟢"
 elif phq_score <= 9:
-    level = "Depresi ringan"
-    color = "🟡"
+    level, color = "Depresi ringan", "🟡"
 elif phq_score <= 14:
-    level = "Depresi sedang"
-    color = "🟠"
+    level, color = "Depresi sedang", "🟠"
 elif phq_score <= 19:
-    level = "Depresi cukup berat"
-    color = "🔴"
+    level, color = "Depresi cukup berat", "🔴"
 else:
-    level = "Depresi berat"
-    color = "⚫"
+    level, color = "Depresi berat", "⚫"
 
 color_map = {
     "🟢": "#b7efc5",
@@ -110,7 +103,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.caption("Keterangan: PHQ-9 (Patient Health Questionnaire-9) adalah alat ukur standar untuk menilai tingkat keparahan depresi.")
+st.caption("PHQ-9 adalah alat ukur standar untuk menilai tingkat keparahan depresi.")
 
 st.divider()
 
@@ -148,7 +141,7 @@ if st.button("Deteksi Tingkat Depresi"):
     try:
         prediction = model.predict(input_data)[0]
         result_label = le.inverse_transform([prediction])[0]
-        
+
         if "depresi" in result_label.lower():
             st.error(f"Hasil Deteksi: **{result_label.upper()}** 😔")
             st.markdown("> Disarankan untuk berkonsultasi dengan profesional kesehatan mental.")
