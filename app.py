@@ -1,55 +1,53 @@
-# =============================================
-# 🧠 Streamlit App - Sistem Prediksi Kesehatan Mental
-# =============================================
 import streamlit as st
 import joblib
 import numpy as np
+import os
+import traceback
 
-# --- Judul Aplikasi ---
 st.set_page_config(page_title="Mental Health Predictor", page_icon="🧠", layout="centered")
-st.title("Sistem Prediksi Kesehatan Mental")
-st.markdown("""
-Aplikasi ini menggunakan **Machine Learning (SVM atau Naive Bayes)** untuk memprediksi kemungkinan seseorang mengalami gangguan kesehatan mental.
-""")
 
-# --- Muat Model dan Scaler ---
+st.title("🧠 Sistem Prediksi Kesehatan Mental (Debug Mode)")
+st.markdown("Jika terjadi error, detailnya akan muncul di bawah.")
+
 try:
-    model = joblib.load("best_model.pkl")
-    scaler = joblib.load("standard_scaler.pkl")
-    st.success("Model dan Scaler berhasil dimuat.")
-except Exception as e:
-    st.error("Gagal memuat model atau scaler. Pastikan file `best_model.pkl` dan `standard_scaler.pkl` ada di folder yang sama.")
-    st.stop()
+    st.subheader(" Cek File di Folder Sekarang")
+    st.write(os.listdir("."))  # menampilkan file yang ada di server
 
-# --- Input Pengguna ---
-st.header("Input Data")
-st.markdown("Masukkan nilai-nilai berdasarkan parameter yang digunakan oleh model:")
+    # Muat model
+    model_path = "best_model.pkl"
+    scaler_path = "standard_scaler.pkl"
 
-col1, col2 = st.columns(2)
-with col1:
-    feature1 = st.number_input("Tingkat Stres", min_value=0.0, step=0.1)
-    feature2 = st.number_input("Tingkat Kecemasan", min_value=0.0, step=0.1)
-    feature3 = st.number_input("Kualitas Tidur", min_value=0.0, step=0.1)
-with col2:
-    feature4 = st.number_input("Tingkat Energi", min_value=0.0, step=0.1)
-    feature5 = st.number_input("Fokus & Konsentrasi", min_value=0.0, step=0.1)
+    if not os.path.exists(model_path):
+        st.error(f" File tidak ditemukan: {model_path}")
+        st.stop()
+    if not os.path.exists(scaler_path):
+        st.error(f" File tidak ditemukan: {scaler_path}")
+        st.stop()
 
-# --- Tombol Prediksi ---
-if st.button(" Prediksi Sekarang"):
-    try:
-        input_data = np.array([[feature1, feature2, feature3, feature4, feature5]])
-        scaled_input = scaler.transform(input_data)
-        prediction = model.predict(scaled_input)[0]
+    model = joblib.load(model_path)
+    scaler = joblib.load(scaler_path)
+    st.success(" Model dan Scaler berhasil dimuat.")
 
+    st.header("Input Data")
+    c1, c2 = st.columns(2)
+    with c1:
+        f1 = st.number_input("Tingkat Stres", min_value=0.0, step=0.1)
+        f2 = st.number_input("Tingkat Kecemasan", min_value=0.0, step=0.1)
+        f3 = st.number_input("Kualitas Tidur", min_value=0.0, step=0.1)
+    with c2:
+        f4 = st.number_input("Tingkat Energi", min_value=0.0, step=0.1)
+        f5 = st.number_input("Konsentrasi", min_value=0.0, step=0.1)
+
+    if st.button(" Prediksi"):
+        data = np.array([[f1, f2, f3, f4, f5]])
+        data_scaled = scaler.transform(data)
+        pred = model.predict(data_scaled)[0]
         st.subheader(" Hasil Prediksi")
-        if prediction == 1:
-            st.error(" **Potensi gangguan mental terdeteksi.**")
+        if pred == 1:
+            st.error(" Potensi gangguan mental terdeteksi.")
         else:
-            st.success(" **Kondisi mental dalam keadaan sehat.**")
+            st.success(" Kondisi mental sehat.")
 
-    except Exception as e:
-        st.error(f"Terjadi kesalahan saat prediksi: {str(e)}")
-
-# --- Footer ---
-st.markdown("---")
-st.caption("Model Machine Learning © 2025 | Dibuat untuk keperluan penelitian dan edukasi.")
+except Exception as e:
+    st.error(" Terjadi error saat menjalankan aplikasi:")
+    st.code(traceback.format_exc())
