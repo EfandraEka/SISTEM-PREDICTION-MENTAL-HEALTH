@@ -1,7 +1,15 @@
+# === Core Streamlit App ===
 streamlit==1.39.0
+
+# === Machine Learning Core ===
 scikit-learn==1.5.2
+joblib==1.4.2
 numpy==1.26.4
 pandas==2.2.2
-joblib==1.4.2
+
+# === Visualization (Optional, for future data analysis or debugging) ===
 matplotlib==3.9.2
 seaborn==0.13.2
+
+# === Optional (recommended for Streamlit Cloud stability) ===
+protobuf==4.25.3
