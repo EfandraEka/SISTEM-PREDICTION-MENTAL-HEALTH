@@ -11,20 +11,20 @@ import os
 # MUAT MODEL DAN SCALER (CEK OTOMATIS)
 # =============================================
 
-# Coba deteksi file model di beberapa lokasi umum
 model_path = None
 scaler_path = None
 
-if os.path.exists("best_model.pkl"):
+# Coba deteksi lokasi file model dan scaler
+if os.path.exists("best_model.pkl") and os.path.exists("standard_scaler.pkl"):
     model_path = "best_model.pkl"
     scaler_path = "standard_scaler.pkl"
-elif os.path.exists("saved_models/best_model.pkl"):
+elif os.path.exists("saved_models/best_model.pkl") and os.path.exists("saved_models/standard_scaler.pkl"):
     model_path = "saved_models/best_model.pkl"
     scaler_path = "saved_models/standard_scaler.pkl"
 
-# Jika file tidak ditemukan, tampilkan pesan error yang ramah
+# Jika file tidak ditemukan, hentikan aplikasi
 if model_path is None or not os.path.exists(model_path):
-    st.error("❌ File model tidak ditemukan.\n\nPastikan `best_model.pkl` dan `standard_scaler.pkl` ada di folder yang sama dengan `app.py` atau di dalam folder `saved_models/`.")
+    st.error("❌ File model tidak ditemukan.\n\nPastikan `best_model.pkl` dan `standard_scaler.pkl` berada di folder yang sama dengan `app.py` atau di dalam folder `saved_models/`.")
     st.stop()
 
 # Muat model dan scaler
@@ -78,7 +78,7 @@ diet_quality = st.selectbox(
 )
 
 screen_time = st.slider(
-    "Berapa jam rata-rata Anda menghabiskan waktu di depan layar per hari?", 
+    "Berapa jam rata-rata Anda menghabiskan waktu di depan layar per hari?",
     0, 16, 6
 )
 
@@ -114,11 +114,31 @@ for col, mapping in encoding_maps.items():
     user_data[col] = user_data[col].map(mapping)
 
 # =============================================
+# SESUAIKAN URUTAN KOLOM DENGAN SCALER
+# =============================================
+try:
+    if hasattr(scaler, "feature_names_in_"):
+        expected_features = list(scaler.feature_names_in_)
+        for col in expected_features:
+            if col not in user_data.columns:
+                user_data[col] = 0
+        user_data = user_data[expected_features]
+    else:
+        st.warning("Scaler tidak memiliki atribut 'feature_names_in_'. Pastikan urutan kolom sesuai saat training.")
+except Exception as e:
+    st.error(f"Terjadi kesalahan saat menyelaraskan fitur dengan scaler: {e}")
+    st.stop()
+
+# =============================================
 # SKALING & PREDIKSI
 # =============================================
-scaled_data = scaler.transform(user_data)
-prediction = model.predict(scaled_data)[0]
-proba = model.predict_proba(scaled_data)[0][1] if hasattr(model, "predict_proba") else None
+try:
+    scaled_data = scaler.transform(user_data)
+    prediction = model.predict(scaled_data)[0]
+    proba = model.predict_proba(scaled_data)[0][1] if hasattr(model, "predict_proba") else None
+except Exception as e:
+    st.error(f"Terjadi kesalahan saat melakukan prediksi: {e}")
+    st.stop()
 
 # =============================================
 # TAMPILKAN HASIL
@@ -128,9 +148,9 @@ st.subheader("Hasil Prediksi:")
 
 if st.button("Prediksi Sekarang"):
     if prediction == 1:
-        st.error(" Hasil Prediksi: **Berisiko Mengalami Masalah Kesehatan Mental**")
+        st.error("Hasil Prediksi: **Berisiko Mengalami Masalah Kesehatan Mental**")
     else:
-        st.success(" Hasil Prediksi: **Sehat / Tidak Berisiko**")
+        st.success("Hasil Prediksi: **Sehat / Tidak Berisiko**")
 
     if proba is not None:
         st.write(f"**Tingkat Keyakinan Model:** {proba*100:.2f}%")
@@ -143,7 +163,7 @@ if st.button("Prediksi Sekarang"):
 # =============================================
 st.markdown(f"""
 ---
- *Dibuat oleh Efandra Eka*  
+*Dibuat oleh Efandra Eka*  
 Model: **{model.__class__.__name__}**  
 Scaler: StandardScaler  
 """)
