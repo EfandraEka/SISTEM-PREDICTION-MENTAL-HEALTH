@@ -5,13 +5,35 @@ import streamlit as st
 import pandas as pd
 import joblib
 import numpy as np
+import os
 
 # =============================================
-# MUAT MODEL DAN SCALER
+# MUAT MODEL DAN SCALER (CEK OTOMATIS)
 # =============================================
-model = joblib.load("saved_models/best_model.pkl")
-scaler = joblib.load("saved_models/standard_scaler.pkl")
 
+# Coba deteksi file model di beberapa lokasi umum
+model_path = None
+scaler_path = None
+
+if os.path.exists("best_model.pkl"):
+    model_path = "best_model.pkl"
+    scaler_path = "standard_scaler.pkl"
+elif os.path.exists("saved_models/best_model.pkl"):
+    model_path = "saved_models/best_model.pkl"
+    scaler_path = "saved_models/standard_scaler.pkl"
+
+# Jika file tidak ditemukan, tampilkan pesan error yang ramah
+if model_path is None or not os.path.exists(model_path):
+    st.error("❌ File model tidak ditemukan.\n\nPastikan `best_model.pkl` dan `standard_scaler.pkl` ada di folder yang sama dengan `app.py` atau di dalam folder `saved_models/`.")
+    st.stop()
+
+# Muat model dan scaler
+model = joblib.load(model_path)
+scaler = joblib.load(scaler_path)
+
+# =============================================
+# KONFIGURASI HALAMAN
+# =============================================
 st.set_page_config(
     page_title="Mental Health Predictor",
     page_icon="🧠",
@@ -30,11 +52,9 @@ Silakan isi beberapa pertanyaan berikut untuk memperkirakan apakah seseorang ber
 # =============================================
 # INPUT PERTANYAAN
 # =============================================
-
-st.subheader(" Jawab Pertanyaan Berikut:")
+st.subheader("📋 Jawab Pertanyaan Berikut:")
 
 age = st.slider("Berapa usia Anda?", 10, 80, 25)
-
 sleep_hours = st.slider("Berapa jam tidur rata-rata Anda per hari?", 0, 12, 7)
 
 stress_level = st.selectbox(
@@ -57,7 +77,10 @@ diet_quality = st.selectbox(
     ["Tidak sehat", "Cukup sehat", "Sehat"]
 )
 
-screen_time = st.slider("Berapa jam rata-rata Anda menghabiskan waktu di depan layar per hari?", 0, 16, 6)
+screen_time = st.slider(
+    "Berapa jam rata-rata Anda menghabiskan waktu di depan layar per hari?", 
+    0, 16, 6
+)
 
 work_pressure = st.selectbox(
     "Apakah pekerjaan atau studi Anda membuat tekanan berlebih?",
@@ -67,8 +90,6 @@ work_pressure = st.selectbox(
 # =============================================
 # KONVERSI INPUT KE DATAFRAME
 # =============================================
-
-# Buat dataframe input user
 user_data = pd.DataFrame({
     "age": [age],
     "sleep_hours": [sleep_hours],
@@ -80,7 +101,7 @@ user_data = pd.DataFrame({
     "work_pressure": [work_pressure]
 })
 
-# Encoding manual untuk kolom kategori (agar sesuai model)
+# Encoding manual sesuai model training
 encoding_maps = {
     "stress_level": {"Jarang": 0, "Kadang-kadang": 1, "Sering": 2, "Sangat sering": 3},
     "exercise_freq": {"Tidak pernah": 0, "1-2 kali": 1, "3-5 kali": 2, "Setiap hari": 3},
@@ -102,9 +123,8 @@ proba = model.predict_proba(scaled_data)[0][1] if hasattr(model, "predict_proba"
 # =============================================
 # TAMPILKAN HASIL
 # =============================================
-
 st.markdown("---")
-st.subheader(" Hasil Prediksi:")
+st.subheader("Hasil Prediksi:")
 
 if st.button("Prediksi Sekarang"):
     if prediction == 1:
@@ -116,14 +136,14 @@ if st.button("Prediksi Sekarang"):
         st.write(f"**Tingkat Keyakinan Model:** {proba*100:.2f}%")
 
     st.markdown("---")
-    st.caption("Model ini menggunakan algoritma Machine Learning (Naive Bayes / SVM) yang dilatih dari dataset gabungan dua sumber data ZIP yang Anda upload.")
+    st.caption("Model ini menggunakan algoritma Machine Learning (Naive Bayes / SVM) yang dilatih dari dataset gabungan dua sumber data ZIP.")
 
 # =============================================
 # FOOTER
 # =============================================
-st.markdown("""
+st.markdown(f"""
 ---
  *Dibuat oleh Efandra Eka*  
-Model: **{0}**  
-Skaler: StandardScaler  
-""".format(model.__class__.__name__))
+Model: **{model.__class__.__name__}**  
+Scaler: StandardScaler  
+""")
