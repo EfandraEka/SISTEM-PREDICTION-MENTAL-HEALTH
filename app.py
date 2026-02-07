@@ -6,30 +6,59 @@ import streamlit as st
 import pandas as pd
 import joblib
 import os
+import sys
 
 # =============================================
 # KONFIGURASI HALAMAN
 # =============================================
 st.set_page_config(
     page_title="Mental Health Predictor",
-    page_icon="Mental Health",
+    page_icon="🧠",
     layout="centered"
 )
 
 # =============================================
-# LOAD PIPELINE
+# INFORMASI ENV (DEBUG AMAN)
+# =============================================
+st.caption(f"Python version: {sys.version.split()[0]}")
+
+# =============================================
+# LOAD PIPELINE DENGAN VALIDASI
 # =============================================
 PIPELINE_PATH = "mental_health_pipeline.pkl"
 
 if not os.path.exists(PIPELINE_PATH):
     st.error(
         "File model tidak ditemukan.\n\n"
-        "Pastikan `mental_health_pipeline.pkl` berada "
+        "Pastikan mental_health_pipeline.pkl berada "
         "di folder yang sama dengan app.py."
     )
     st.stop()
 
-pipeline = joblib.load(PIPELINE_PATH)
+try:
+    pipeline = joblib.load(PIPELINE_PATH)
+except Exception as e:
+    st.error(
+        "Gagal memuat model.\n\n"
+        "Kemungkinan penyebab:\n"
+        "- Perbedaan versi Python\n"
+        "- Perbedaan versi scikit-learn\n"
+        "- File pickle rusak\n\n"
+        f"Detail error:\n{e}"
+    )
+    st.stop()
+
+# =============================================
+# VALIDASI STRUKTUR PIPELINE
+# =============================================
+if not hasattr(pipeline, "predict"):
+    st.error("File yang dimuat bukan model atau pipeline yang valid.")
+    st.stop()
+
+if hasattr(pipeline, "named_steps"):
+    if "model" not in pipeline.named_steps:
+        st.error("Pipeline tidak memiliki step bernama 'model'.")
+        st.stop()
 
 # =============================================
 # HEADER
@@ -77,19 +106,19 @@ work_pressure = st.selectbox(
 )
 
 # =============================================
-# DATAFRAME INPUT (MENTAH, TANPA ENCODING)
+# DATAFRAME INPUT (WAJIB SESUAI TRAINING)
 # =============================================
 user_data = pd.DataFrame(
-    {
-        "age": [age],
-        "sleep_hours": [sleep_hours],
-        "screen_time": [screen_time],
-        "stress_level": [stress_level],
-        "exercise_freq": [exercise_freq],
-        "social_support": [social_support],
-        "diet_quality": [diet_quality],
-        "work_pressure": [work_pressure],
-    }
+    [{
+        "age": age,
+        "sleep_hours": sleep_hours,
+        "screen_time": screen_time,
+        "stress_level": stress_level,
+        "exercise_freq": exercise_freq,
+        "social_support": social_support,
+        "diet_quality": diet_quality,
+        "work_pressure": work_pressure,
+    }]
 )
 
 # =============================================
@@ -100,13 +129,18 @@ st.subheader("Hasil Prediksi")
 
 if st.button("Prediksi"):
     try:
-        with st.spinner("Memproses data"):
+        with st.spinner("Memproses data..."):
             prediction = pipeline.predict(user_data)[0]
 
-            if hasattr(pipeline.named_steps["model"], "predict_proba"):
+            proba = None
+            if hasattr(pipeline, "predict_proba"):
                 proba = pipeline.predict_proba(user_data)[0][1]
-            else:
-                proba = None
+            elif hasattr(pipeline, "named_steps"):
+                model = pipeline.named_steps.get("model")
+                if hasattr(model, "predict_proba"):
+                    proba = model.predict_proba(
+                        pipeline[:-1].transform(user_data)
+                    )[0][1]
 
         if prediction == 1:
             st.error("Berisiko mengalami masalah kesehatan mental")
@@ -117,7 +151,10 @@ if st.button("Prediksi"):
             st.write(f"Tingkat keyakinan model: {proba * 100:.2f}%")
 
     except Exception as e:
-        st.error(f"Terjadi kesalahan saat prediksi: {e}")
+        st.error(
+            "Terjadi kesalahan saat melakukan prediksi.\n\n"
+            f"Detail error:\n{e}"
+        )
 
 # =============================================
 # FOOTER
