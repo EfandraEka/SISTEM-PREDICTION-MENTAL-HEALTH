@@ -4,5 +4,5 @@ pandas
 numpy
 joblib
 imbalanced-learn
-seaborn
 matplotlib
+seaborn
