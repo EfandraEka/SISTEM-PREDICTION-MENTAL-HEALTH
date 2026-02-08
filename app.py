@@ -1,168 +1,112 @@
-# =============================================
-# STREAMLIT APP — Mental Health Prediction
-# =============================================
-
 import streamlit as st
 import pandas as pd
 import joblib
 import os
-import sys
 
-# =============================================
-# KONFIGURASI HALAMAN
-# =============================================
+# =============================
+# CONFIG
+# =============================
 st.set_page_config(
     page_title="Mental Health Predictor",
-    page_icon="🧠",
     layout="centered"
 )
 
-# =============================================
-# INFORMASI ENV (DEBUG AMAN)
-# =============================================
-st.caption(f"Python version: {sys.version.split()[0]}")
+# =============================
+# LOAD FILE
+# =============================
+MODEL_PATH = "best_model.pkl"
+SCALER_PATH = "standard_scaler.pkl"
+FEATURE_PATH = "feature_columns.pkl"
 
-# =============================================
-# LOAD PIPELINE DENGAN VALIDASI
-# =============================================
-PIPELINE_PATH = "mental_health_pipeline.pkl"
-
-if not os.path.exists(PIPELINE_PATH):
-    st.error(
-        "File model tidak ditemukan.\n\n"
-        "Pastikan mental_health_pipeline.pkl berada "
-        "di folder yang sama dengan app.py."
-    )
-    st.stop()
-
-try:
-    pipeline = joblib.load(PIPELINE_PATH)
-except Exception as e:
-    st.error(
-        "Gagal memuat model.\n\n"
-        "Kemungkinan penyebab:\n"
-        "- Perbedaan versi Python\n"
-        "- Perbedaan versi scikit-learn\n"
-        "- File pickle rusak\n\n"
-        f"Detail error:\n{e}"
-    )
-    st.stop()
-
-# =============================================
-# VALIDASI STRUKTUR PIPELINE
-# =============================================
-if not hasattr(pipeline, "predict"):
-    st.error("File yang dimuat bukan model atau pipeline yang valid.")
-    st.stop()
-
-if hasattr(pipeline, "named_steps"):
-    if "model" not in pipeline.named_steps:
-        st.error("Pipeline tidak memiliki step bernama 'model'.")
+for path in [MODEL_PATH, SCALER_PATH, FEATURE_PATH]:
+    if not os.path.exists(path):
+        st.error(f"File {path} tidak ditemukan")
         st.stop()
 
-# =============================================
-# HEADER
-# =============================================
-st.title("Mental Health Prediction App")
-st.markdown(
-    """
-Aplikasi ini memprediksi potensi masalah kesehatan mental
-berdasarkan data yang dimasukkan pengguna.
-"""
-)
+model = joblib.load(MODEL_PATH)
+scaler = joblib.load(SCALER_PATH)
+feature_columns = joblib.load(FEATURE_PATH)
 
-# =============================================
-# INPUT USER
-# =============================================
-st.subheader("Input Data")
+# =============================
+# MAPPING
+# =============================
+stress_map = {
+    "Jarang": 0,
+    "Kadang-kadang": 1,
+    "Sering": 2,
+    "Sangat sering": 3
+}
+
+exercise_map = {
+    "Tidak pernah": 0,
+    "1-2 kali": 1,
+    "3-5 kali": 2,
+    "Setiap hari": 3
+}
+
+support_map = {
+    "Tidak sama sekali": 0,
+    "Sedikit": 1,
+    "Cukup": 2,
+    "Sangat kuat": 3
+}
+
+diet_map = {
+    "Tidak sehat": 0,
+    "Cukup sehat": 1,
+    "Sehat": 2
+}
+
+work_map = {
+    "Tidak": 0,
+    "Kadang-kadang": 1,
+    "Sering": 2,
+    "Sangat sering": 3
+}
+
+# =============================
+# UI
+# =============================
+st.title("Mental Health Prediction")
 
 age = st.slider("Usia", 10, 80, 25)
-sleep_hours = st.slider("Jam tidur per hari", 0, 12, 7)
-screen_time = st.slider("Waktu layar per hari (jam)", 0, 16, 6)
+sleep_hours = st.slider("Jam tidur", 0, 12, 7)
+screen_time = st.slider("Waktu layar", 0, 16, 6)
 
-stress_level = st.selectbox(
-    "Frekuensi stres",
-    ["Jarang", "Kadang-kadang", "Sering", "Sangat sering"]
-)
+stress = st.selectbox("Frekuensi stres", list(stress_map))
+exercise = st.selectbox("Frekuensi olahraga", list(exercise_map))
+support = st.selectbox("Dukungan sosial", list(support_map))
+diet = st.selectbox("Pola makan", list(diet_map))
+work = st.selectbox("Tekanan kerja/studi", list(work_map))
 
-exercise_freq = st.selectbox(
-    "Frekuensi olahraga per minggu",
-    ["Tidak pernah", "1-2 kali", "3-5 kali", "Setiap hari"]
-)
-
-social_support = st.selectbox(
-    "Dukungan sosial",
-    ["Tidak sama sekali", "Sedikit", "Cukup", "Sangat kuat"]
-)
-
-diet_quality = st.selectbox(
-    "Kualitas pola makan",
-    ["Tidak sehat", "Cukup sehat", "Sehat"]
-)
-
-work_pressure = st.selectbox(
-    "Tekanan pekerjaan atau studi",
-    ["Tidak", "Kadang-kadang", "Sering", "Sangat sering"]
-)
-
-# =============================================
-# DATAFRAME INPUT (WAJIB SESUAI TRAINING)
-# =============================================
-user_data = pd.DataFrame(
-    [{
-        "age": age,
-        "sleep_hours": sleep_hours,
-        "screen_time": screen_time,
-        "stress_level": stress_level,
-        "exercise_freq": exercise_freq,
-        "social_support": social_support,
-        "diet_quality": diet_quality,
-        "work_pressure": work_pressure,
-    }]
-)
-
-# =============================================
-# PREDIKSI
-# =============================================
-st.markdown("---")
-st.subheader("Hasil Prediksi")
-
+# =============================
+# PREDICTION
+# =============================
 if st.button("Prediksi"):
     try:
-        with st.spinner("Memproses data..."):
-            prediction = pipeline.predict(user_data)[0]
+        input_dict = {
+            "age": age,
+            "sleep_hours": sleep_hours,
+            "screen_time": screen_time,
+            "stress_level": stress_map[stress],
+            "exercise_freq": exercise_map[exercise],
+            "social_support": support_map[support],
+            "diet_quality": diet_map[diet],
+            "work_pressure": work_map[work],
+        }
 
-            proba = None
-            if hasattr(pipeline, "predict_proba"):
-                proba = pipeline.predict_proba(user_data)[0][1]
-            elif hasattr(pipeline, "named_steps"):
-                model = pipeline.named_steps.get("model")
-                if hasattr(model, "predict_proba"):
-                    proba = model.predict_proba(
-                        pipeline[:-1].transform(user_data)
-                    )[0][1]
+        df = pd.DataFrame([input_dict])
 
-        if prediction == 1:
-            st.error("Berisiko mengalami masalah kesehatan mental")
+        # pastikan urutan fitur
+        df = df[feature_columns]
+
+        X_scaled = scaler.transform(df)
+        pred = model.predict(X_scaled)[0]
+
+        if pred == 1:
+            st.error("Berisiko mengalami gangguan kesehatan mental")
         else:
-            st.success("Tidak berisiko mengalami masalah kesehatan mental")
-
-        if proba is not None:
-            st.write(f"Tingkat keyakinan model: {proba * 100:.2f}%")
+            st.success("Tidak berisiko mengalami gangguan kesehatan mental")
 
     except Exception as e:
-        st.error(
-            "Terjadi kesalahan saat melakukan prediksi.\n\n"
-            f"Detail error:\n{e}"
-        )
-
-# =============================================
-# FOOTER
-# =============================================
-st.markdown(
-    """
----
-Dibuat oleh Efandra Eka  
-Model menggunakan pipeline preprocessing dan machine learning
-"""
-)
+        st.error(f"Terjadi kesalahan: {e}")
